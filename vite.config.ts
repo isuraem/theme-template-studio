@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   
   return {
-    base: '/theme-template-studio/',
+   base: env.VITE_BASE_PATH || '/theme-template-studio/',
     server: {
       proxy: {
         "/api": {

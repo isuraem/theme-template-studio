@@ -1,6 +1,6 @@
 import * as React from "react";
 import { format } from "date-fns";
-import { Calendar, CalendarIcon, BarChart3, Download, RefreshCw } from "lucide-react";
+import { CalendarIcon, BarChart3, Download, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -36,18 +36,15 @@ const backendApi = import.meta.env.VITE_BACKEND_API;
 
 const FormSchema = z.object({
   productId: z.string().min(1, "Product ID is required"),
-  startDate: z.date({
-    required_error: "Start date is required",
-  }),
-  endDate: z.date({
-    required_error: "End date is required",
-  }),
+  startDate: z.date({ required_error: "Start date is required" }),
+  endDate: z.date({ required_error: "End date is required" }),
 });
 
 const AnalyticsDashboard = () => {
   const [showResults, setShowResults] = React.useState(false);
-  const [productData, setproductData] = React.useState([]);
+  const [productData, setProductData] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(false);
+
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
@@ -61,8 +58,12 @@ const AnalyticsDashboard = () => {
     setLoading(true);
     toast({
       title: "Analytics Query Submitted",
-      description: `Fetching data for Product ID: ${data.productId} from ${format(data.startDate, "PPP")} to ${format(data.endDate, "PPP")}`,
+      description: `Fetching data for Product ID: ${data.productId} from ${format(
+        data.startDate,
+        "PPP"
+      )} to ${format(data.endDate, "PPP")}`,
     });
+
     try {
       const productId = data.productId;
       const startDate = format(data.startDate, "yyyy-MM-dd");
@@ -71,8 +72,7 @@ const AnalyticsDashboard = () => {
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch product sales");
       const result = await response.json();
-      console.log("Fetched data:", result);
-      setproductData(result|| []);
+      setProductData(result || []);
       setShowResults(true);
     } catch (error) {
       toast({
@@ -86,25 +86,43 @@ const AnalyticsDashboard = () => {
     }
   }
 
+  // ✅ FIXED CSV GENERATION FOR EXCEL
   const downloadCSV = () => {
-    const headers = ["Product Title", "Product Variant Title", "Product Variant SKU", "Net Items Sold", "Net Sales"];
+    const headers = [
+      "Product Title",
+      "Product Variant Title",
+      "Product Variant SKU",
+      "Net Items Sold",
+      "Net Sales",
+    ];
+
+    const escapeCSV = (value: any) => {
+      if (value === null || value === undefined) return '""';
+      const str = value.toString();
+      return `"${str.replace(/"/g, '""')}"`;
+    };
+
     const csvContent = [
-      headers.join(","),
-      ...productData.map(row => [
-        `"${row.productTitle}"`,
-        `"${row.variantTitle}"`,
-        `"${row.sku}"`,
-        row.netItemsSold,
-        row.netSales.toFixed(2)
-      ].join(","))
+      headers.map(escapeCSV).join(","),
+      ...productData.map((row) =>
+        [
+          escapeCSV(row.productTitle),
+          escapeCSV(row.variantTitle),
+          escapeCSV(row.sku),
+          escapeCSV(row.netItemsSold),
+          escapeCSV(row.netSales.toFixed(2)),
+        ].join(",")
+      ),
     ].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `analytics-data-${format(new Date(), "yyyy-MM-dd")}.csv`);
-    link.style.visibility = "hidden";
+    link.setAttribute(
+      "download",
+      `analytics-data-${format(new Date(), "yyyy-MM-dd")}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -112,7 +130,7 @@ const AnalyticsDashboard = () => {
 
   const clearResults = () => {
     setShowResults(false);
-    setproductData([]);
+    setProductData([]);
     form.reset({
       productId: "9525756756292",
       startDate: new Date("2025-06-20"),
@@ -136,36 +154,29 @@ const AnalyticsDashboard = () => {
           </p>
         </div>
 
-        {/* Main Form Card */}
+        {/* Form Card */}
         <Card className="shadow-lg">
           <CardContent className="p-8">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                {/* Product ID Field */}
                 <FormField
                   control={form.control}
                   name="productId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium text-foreground">
-                        Product ID
-                      </FormLabel>
+                      <FormLabel>Product ID</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Enter the numeric product ID from your analytics query"
+                          placeholder="Enter numeric product ID"
                           {...field}
                           className="h-12"
                         />
                       </FormControl>
-                      <p className="text-sm text-muted-foreground">
-                        Enter the numeric product ID from your analytics query
-                      </p>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                {/* Date Range Fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Start Date */}
                   <FormField
@@ -173,9 +184,7 @@ const AnalyticsDashboard = () => {
                     name="startDate"
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
-                        <FormLabel className="text-sm font-medium text-foreground">
-                          Start Date
-                        </FormLabel>
+                        <FormLabel>Start Date</FormLabel>
                         <Popover>
                           <PopoverTrigger asChild>
                             <FormControl>
@@ -186,11 +195,9 @@ const AnalyticsDashboard = () => {
                                   !field.value && "text-muted-foreground"
                                 )}
                               >
-                                {field.value ? (
-                                  format(field.value, "MM/dd/yyyy")
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
+                                {field.value
+                                  ? format(field.value, "MM/dd/yyyy")
+                                  : "Pick a date"}
                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                               </Button>
                             </FormControl>
@@ -201,7 +208,7 @@ const AnalyticsDashboard = () => {
                               selected={field.value}
                               onSelect={field.onChange}
                               initialFocus
-                              className={cn("p-3 pointer-events-auto")}
+                              className="p-3 pointer-events-auto"
                             />
                           </PopoverContent>
                         </Popover>
@@ -216,9 +223,7 @@ const AnalyticsDashboard = () => {
                     name="endDate"
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
-                        <FormLabel className="text-sm font-medium text-foreground">
-                          End Date
-                        </FormLabel>
+                        <FormLabel>End Date</FormLabel>
                         <Popover>
                           <PopoverTrigger asChild>
                             <FormControl>
@@ -229,11 +234,9 @@ const AnalyticsDashboard = () => {
                                   !field.value && "text-muted-foreground"
                                 )}
                               >
-                                {field.value ? (
-                                  format(field.value, "MM/dd/yyyy")
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
+                                {field.value
+                                  ? format(field.value, "MM/dd/yyyy")
+                                  : "Pick a date"}
                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                               </Button>
                             </FormControl>
@@ -244,7 +247,7 @@ const AnalyticsDashboard = () => {
                               selected={field.value}
                               onSelect={field.onChange}
                               initialFocus
-                              className={cn("p-3 pointer-events-auto")}
+                              className="p-3 pointer-events-auto"
                             />
                           </PopoverContent>
                         </Popover>
@@ -254,23 +257,12 @@ const AnalyticsDashboard = () => {
                   />
                 </div>
 
-                {/* Submit Button */}
                 <Button
                   type="submit"
-                  className="h-12 px-6 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
+                  className="h-12 px-6 bg-primary hover:bg-primary/90"
                   disabled={loading}
                 >
-                  {loading ? (
-                    <>
-                      <span className="mr-2 animate-spin"><BarChart3 className="h-4 w-4" /></span>
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      Get Analytics-Matching Data
-                    </>
-                  )}
+                  {loading ? "Loading..." : "Get Analytics-Matching Data"}
                 </Button>
               </form>
             </Form>
@@ -283,7 +275,7 @@ const AnalyticsDashboard = () => {
             <CardContent className="p-8">
               <div className="mb-6 flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-dashboard-header mb-2">
+                  <h2 className="text-xl font-semibold mb-2">
                     Analytics Results
                   </h2>
                   <p className="text-dashboard-subtitle">
@@ -291,21 +283,11 @@ const AnalyticsDashboard = () => {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    onClick={clearResults}
-                    variant="outline"
-                    className="h-10 px-4"
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Clear Results
+                  <Button onClick={clearResults} variant="outline">
+                    <RefreshCw className="mr-2 h-4 w-4" /> Clear Results
                   </Button>
-                  <Button
-                    onClick={downloadCSV}
-                    variant="outline"
-                    className="h-10 px-4"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Download CSV
+                  <Button onClick={downloadCSV} variant="outline">
+                    <Download className="mr-2 h-4 w-4" /> Download CSV
                   </Button>
                 </div>
               </div>
@@ -314,21 +296,29 @@ const AnalyticsDashboard = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="font-semibold">Product Title</TableHead>
-                      <TableHead className="font-semibold">Product Variant Title</TableHead>
-                      <TableHead className="font-semibold">Product Variant SKU</TableHead>
-                      <TableHead className="font-semibold text-right">Net Items Sold</TableHead>
-                      <TableHead className="font-semibold text-right">Net Sales</TableHead>
+                      <TableHead>Product Title</TableHead>
+                      <TableHead>Product Variant Title</TableHead>
+                      <TableHead>Product Variant SKU</TableHead>
+                      <TableHead className="text-right">
+                        Net Items Sold
+                      </TableHead>
+                      <TableHead className="text-right">Net Sales</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {productData.map((item, index) => (
                       <TableRow key={index}>
-                        <TableCell className="font-medium">{item.productTitle}</TableCell>
+                        <TableCell>{item.productTitle}</TableCell>
                         <TableCell>{item.variantTitle}</TableCell>
-                        <TableCell className="font-mono text-sm">{item.sku}</TableCell>
-                        <TableCell className="text-right font-medium">{item.netItemsSold}</TableCell>
-                        <TableCell className="text-right font-medium">${item.netSales.toFixed(2)}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {item.sku}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {item.netItemsSold}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          ${item.netSales.toFixed(2)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

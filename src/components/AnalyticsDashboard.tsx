@@ -48,29 +48,47 @@ const AnalyticsDashboard = () => {
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      productId: "9525756756292",
-      startDate: new Date("2025-06-20"),
+      productId: "", // empty by default
+      startDate: (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 90);
+        return d;
+      })(),
       endDate: new Date(),
     },
   });
 
+
   async function onSubmit(data: z.infer<typeof FormSchema>) {
     setLoading(true);
+    const productIds = data.productId
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean)
+      .slice(0, 10); // ✅ limit to max 10 products
+
     toast({
       title: "Analytics Query Submitted",
-      description: `Fetching data for Product ID: ${data.productId} from ${format(
+      description: `Fetching data for ${productIds.length} product(s) from ${format(
         data.startDate,
         "PPP"
       )} to ${format(data.endDate, "PPP")}`,
     });
 
     try {
-      const productId = data.productId;
       const startDate = format(data.startDate, "yyyy-MM-dd");
       const endDate = format(data.endDate, "yyyy-MM-dd");
-      const url = `/api/product-sales?product_id=gid://shopify/Product/${productId}&start_date=${startDate}&end_date=${endDate}`;
+
+      // ✅ Build query string for multiple product_ids
+      const query = productIds
+        .map((id) => `product_id=gid://shopify/Product/${id}`)
+        .join("&");
+
+      const url = `/api/product-sales?${query}&start_date=${startDate}&end_date=${endDate}`;
+
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch product sales");
+
       const result = await response.json();
       setProductData(result || []);
       setShowResults(true);
@@ -132,8 +150,12 @@ const AnalyticsDashboard = () => {
     setShowResults(false);
     setProductData([]);
     form.reset({
-      productId: "9525756756292",
-      startDate: new Date("2025-06-20"),
+      productId: "", // empty by default
+      startDate: (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 90);
+        return d;
+      })(),
       endDate: new Date(),
     });
   };
@@ -167,10 +189,11 @@ const AnalyticsDashboard = () => {
                       <FormLabel>Product ID</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Enter numeric product ID"
+                          placeholder="Add products up to 1–10, e.g: 14968509825348, 14800375185732, …"
                           {...field}
                           className="h-12"
                         />
+
                       </FormControl>
                       <FormMessage />
                     </FormItem>

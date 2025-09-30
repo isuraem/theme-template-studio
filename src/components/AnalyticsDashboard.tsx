@@ -43,6 +43,7 @@ const FormSchema = z.object({
 });
 
 const AnalyticsDashboard = () => {
+  const [updatingSheet, setUpdatingSheet] = React.useState(false);
   const [showResults, setShowResults] = React.useState(false);
   const [productData, setProductData] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -78,11 +79,11 @@ const AnalyticsDashboard = () => {
 
     if (loading) {
       const startTime = Date.now();
-      
+
       interval = setInterval(() => {
         const elapsed = Date.now() - startTime;
         const elapsedSeconds = elapsed / 1000;
-        
+
         // Update processing time
         setProcessingStats(prev => ({
           ...prev,
@@ -145,10 +146,10 @@ const AnalyticsDashboard = () => {
     // Create new abort controller for this request
     const controller = new AbortController();
     setAbortController(controller);
-    
+
     setLoading(true);
     const startTime = new Date();
-    
+
     // Parse all product IDs without limit
     const productIds = data.productId
       .split(",")
@@ -201,14 +202,14 @@ const AnalyticsDashboard = () => {
       setLoadingProgress(40);
       setProcessingStats(prev => ({ ...prev, currentPhase: "fetching_sales" }));
 
-      const response = await fetch(url, { 
+      const response = await fetch(url, {
         signal: controller.signal,
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         }
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Server error: ${response.status} - ${errorText}`);
@@ -220,18 +221,18 @@ const AnalyticsDashboard = () => {
       setProcessingStats(prev => ({ ...prev, currentPhase: "processing" }));
 
       const result = await response.json();
-      
+
       // Final processing
       setCurrentStatus("Finalizing results...");
       setLoadingProgress(95);
-      
+
       // Small delay to show completion
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       // Complete the progress
       setLoadingProgress(100);
       setCurrentStatus("Complete!");
-      
+
       setProductData(result || []);
       setShowResults(true);
 
@@ -255,7 +256,7 @@ const AnalyticsDashboard = () => {
         // Request was cancelled, don't show error
         return;
       }
-      
+
       console.error('Fetch error:', error);
       setCurrentStatus("Error occurred during processing");
       toast({
@@ -326,6 +327,50 @@ const AnalyticsDashboard = () => {
       title: "CSV Downloaded",
       description: `Successfully downloaded data for ${productData.length} variants`,
     });
+  };
+
+  const updateGoogleSheet = async () => {
+    if (productData.length === 0) {
+      toast({
+        title: "No data to update",
+        description: "Please run a query first to get data.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUpdatingSheet(true); // start loading
+    const url = `${backendApi}/update-googlesheet`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(productData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server error: ${response.status} - ${errorText}`);
+      }
+
+      toast({
+        title: "Google Sheet Updated",
+        description: "Successfully updated the Google Sheet with current data.",
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error updating Google Sheet",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingSheet(false); // stop loading
+    }
   };
 
   const clearResults = () => {
@@ -506,7 +551,7 @@ const AnalyticsDashboard = () => {
                       "Get Analytics-Matching Data"
                     )}
                   </Button>
-                  
+
                   {loading && (
                     <Button
                       type="button"
@@ -541,7 +586,7 @@ const AnalyticsDashboard = () => {
                       Est. {processingStats.estimatedTime}s
                     </Badge>
                     {processingStats.currentPhase !== "idle" && (
-                      <Badge 
+                      <Badge
                         variant={processingStats.currentPhase === "complete" ? "default" : "secondary"}
                         className={processingStats.currentPhase === "complete" ? "bg-green-100 text-green-800" : ""}
                       >
@@ -550,7 +595,7 @@ const AnalyticsDashboard = () => {
                     )}
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Progress</span>
@@ -558,7 +603,7 @@ const AnalyticsDashboard = () => {
                   </div>
                   <Progress value={loadingProgress} className="w-full h-2" />
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                   <div className="flex items-center gap-2 p-3 rounded-md bg-blue-50">
                     <BarChart3 className="h-4 w-4 text-blue-600" />
@@ -579,7 +624,7 @@ const AnalyticsDashboard = () => {
                     <div>
                       <div className="font-medium">Elapsed</div>
                       <div className="text-xs text-muted-foreground">
-                        {processingStats.startTime && 
+                        {processingStats.startTime &&
                           `${Math.round((new Date().getTime() - processingStats.startTime.getTime()) / 1000)}s`
                         }
                       </div>
@@ -595,7 +640,7 @@ const AnalyticsDashboard = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 {processingStats.totalProducts > 50 && (
                   <div className="p-4 bg-amber-50 border border-amber-200 rounded-md">
                     <div className="flex items-center gap-2 text-amber-800">
@@ -603,7 +648,7 @@ const AnalyticsDashboard = () => {
                       <span className="text-sm font-medium">Large Dataset Processing</span>
                     </div>
                     <p className="text-xs text-amber-700 mt-1">
-                      Processing {processingStats.totalProducts} products may take several minutes. 
+                      Processing {processingStats.totalProducts} products may take several minutes.
                       The system will automatically handle rate limiting and batch processing.
                     </p>
                   </div>
@@ -632,6 +677,19 @@ const AnalyticsDashboard = () => {
                   </Button>
                   <Button onClick={downloadCSV} variant="outline">
                     <Download className="mr-2 h-4 w-4" /> Download CSV
+                  </Button>
+                  <Button
+                    onClick={updateGoogleSheet}
+                    variant="outline"
+                    disabled={updatingSheet}
+                  >
+                    {updatingSheet ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating...
+                      </>
+                    ) : (
+                      "Update CSV"
+                    )}
                   </Button>
                 </div>
               </div>

@@ -349,7 +349,7 @@ const AnalyticsDashboard = () => {
           "Accept": "application/json",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(productData),
+        body: JSON.stringify({ data: productData }),
       });
 
       if (!response.ok) {
